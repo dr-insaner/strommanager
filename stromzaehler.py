@@ -6,6 +6,7 @@ import csv
 import struct
 import influxdb
 import ezrdata
+import ds18b20data
 
 # Konstanten
 SPANNUNG_PV = bytes.fromhex('01040000000271cb') #Spannung
@@ -40,7 +41,7 @@ WARTEN_AUF_ANTWORT_SEKUNDEN = 5
 SERVER_DATA_DIR = '/home/pi/stromzaehler/data'
 WINDOWS_DATA_DIR = 'testdata'
 
-INTERVAL_SECS = 2
+INTERVAL_SECS = 1
 
 def _WertParsen(antwort):
   #return round(float(np.frombuffer(bytes(reversed(antwort[3:7])),dtype=np.float32)),1)
@@ -205,10 +206,24 @@ def heizung_to_influx(dbClient, data):
                     'battery' : battery,
                     'device_state' : device_state
                 }})
-
         dbClient.write_points(influxdata)
     except Exception as e:
         print("Fehler beim speichern in influxdb (heat)", e)
+
+def ds18b20sensoren_to_influx(dbClient, data1):
+    try:
+        influxdata = []
+        for item in data1:
+            sensor, temperature = item
+            influxdata.append({
+                'measurement' : 'ds18b20sensoren',
+                'tags' : { 'name' : sensor },
+                'fields' : {
+                    'temperature' : temperature,
+                }})
+        dbClient.write_points(influxdata)
+    except Exception as e:
+        print("Fehler beim speichern in influxdb (ds18b20sensoren)", e)
 
 
 if __name__ == "__main__":
@@ -237,9 +252,11 @@ if __name__ == "__main__":
         if skip >= 20:
             data = ezrdata.poll_all()
             heizung_to_influx(dbClient, data)
-            skip = 1
-            print('heizung2influx')
+            
+            data1 = ds18b20data.poll_all()
+            ds18b20sensoren_to_influx(dbClient, data1)
 
+            skip = 1
         
       except Exception as e:
           print("Fehler beim verarbeiten", e)
