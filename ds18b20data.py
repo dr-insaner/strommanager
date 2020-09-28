@@ -47,7 +47,7 @@ def read_temp_raw(i):
 def read_temp(i):
     lines = read_temp_raw(i)
     while lines[0].strip()[-3:] != 'YES':
-        time.sleep(0.2)
+        time.sleep(0.1)
         lines = read_temp_raw(i)
     equals_pos = lines[1].find('t=')
     if equals_pos != -1:
@@ -57,20 +57,18 @@ def read_temp(i):
         
 
 def poll_all():
-    data1 = poll_ezr_data(URL1)
-    data2 = poll_ezr_data(URL2)
-    return data1 + data2
+    data = []
+    pair = []
+    i=0
+    while i<=8:
+        pair = (einbauort[i], read_temp(i))
+        data.append(pair) 
+        i=i+1
+    return data
 
 if __name__ == "__main__":
-    #data = poll_all()
-    #print(data)
-    while True:          
-        while i<=8:
-            print(ID[i], einbauort[i], read_temp(i))
-            i=i+1
-            time.sleep(0.5)
+    data = poll_all()
+    print(data)
 
-        if i>8:
-            i=0
 
 
