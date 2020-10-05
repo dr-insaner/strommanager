@@ -85,7 +85,7 @@ class StromZaehler:
             self.dec_strom2 = self.HoleWert(STROM2)
             self.dec_strom3 = self.HoleWert(STROM3)
 
-            self.dec_leistung = self.HoleWert(LEISTUNG)
+            self.dec_leistung = self.HoleWert(LEISTUNG) #Leistungen sind Leistungen des Netzzählers, bedeutet die PV-Leistung ist schon abgezogen
             self.dec_leistung1 = self.HoleWert(LEISTUNG1)
             self.dec_leistung2 = self.HoleWert(LEISTUNG2)
             self.dec_leistung3 = self.HoleWert(LEISTUNG3)
@@ -99,12 +99,12 @@ class StromZaehler:
 
             #Berechnungen zu PV Kennzahlen
             if self.dec_leistung_pv > 0:
-                if self.dec_leistung_pv < self.dec_leistung:
+                if self.dec_leistung > 0: #Leistung wird aus Netz bezogen
                     self.dec_eigenverbrauch = self.dec_leistung_pv #im Falle von PV Leistung wird komplett selber verbraucht
-                if self.dec_leistung_pv > self.dec_leistung:
+                if self.dec_leistung < 0: #Einspeisung
                     self.dec_eigenverbrauch = self.dec_leistung_pv + self.dec_leistung #im Falle von Netzeinspeisung (je nach Vorzeichen dec_leistung, noch nicht relevant)
                 self.dec_eigenverbrauch_ratio = 100.0 * self.dec_eigenverbrauch / self.dec_leistung_pv
-                self.dec_autarkie_ratio = 100.0 * self.dec_eigenverbrauch / self.dec_leistung
+                self.dec_autarkie_ratio = 100.0 * self.dec_eigenverbrauch / (self.dec_leistung + self.dec_eigenverbrauch)
 
             if self.dec_leistung_pv == 0:
                 self.dec_eigenverbrauch = 0.0
