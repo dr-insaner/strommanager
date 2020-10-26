@@ -47,7 +47,7 @@ def switch_zirkulationspumpe(data):
         mybytes = fp.read()
         mystring = mybytes.decode("utf8")
         fp.close()
-    print(mystring)
+    #print(mystring)
     if mystring == '{"POWER":"OFF"}':
         pumpstate = 0
     elif mystring == '{"POWER":"ON"}':
@@ -86,7 +86,7 @@ def poll_all():
         pair = (einbauort[i], read_temp(i))
         data.append(pair) 
         i=i+1
-    pumpstate = ('WW-Pumpenstatus',switch_zirkulationspumpe(data))
+    pumpstate = ('WW-Pumpenstatus',float(switch_zirkulationspumpe(data)))
     data.append(pumpstate)    
     return data
 
