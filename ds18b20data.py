@@ -4,6 +4,7 @@
 import os
 import glob
 import time
+import urllib.request
  
 os.system('modprobe w1-gpio')
 os.system('modprobe w1-therm')
@@ -33,8 +34,29 @@ einbauort[8] =  'SolarVorlauf'
 base_dir = '/sys/bus/w1/devices/'
 
 i=0 #Zähler für die Sensoren
-#v=0
-Number_Of_Files=0
+#Number_Of_Files=0
+
+def switch_zirkulationspumpe(data):
+    if data[6][1]>50 and data[8][1]>40: # data[6] 'SpeicherOben' und data[8] 'SolarVorlauf'
+        fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20ON")
+        mybytes = fp.read()
+        mystring = mybytes.decode("utf8")
+        fp.close()
+    else:
+        fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20OFF")
+        mybytes = fp.read()
+        mystring = mybytes.decode("utf8")
+        fp.close()
+    print(mystring)
+    if mystring == '{"POWER":"OFF"}':
+        pumpstate = 0
+    elif mystring == '{"POWER":"ON"}':
+        pumpstate = 1
+    else:
+        pumpstate = 9
+    return pumpstate
+
+
 
 def read_temp_raw(i):
 	device_file = base_dir + ID[i] + '/w1_slave'
@@ -64,11 +86,10 @@ def poll_all():
         pair = (einbauort[i], read_temp(i))
         data.append(pair) 
         i=i+1
+    pumpstate = ('WW-Pumpenstatus',switch_zirkulationspumpe(data))
+    data.append(pumpstate)    
     return data
 
 if __name__ == "__main__":
     data = poll_all()
     print(data)
-
-
-
