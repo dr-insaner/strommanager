@@ -8,6 +8,7 @@ import influxdb
 import ezrdata
 import ds18b20data
 
+
 # Konstanten
 SPANNUNG_PV = bytes.fromhex('01040000000271cb') #Spannung
 STROM_PV =    bytes.fromhex('0104000600069009') #Strom
@@ -197,14 +198,13 @@ def heizung_to_influx(dbClient, data):
         for item in data:
             room, actual, target, area_state, battery, device_state = item
             influxdata.append({
-                'measurement' : 'heat',
-                'tags' : { 'name' : room },
-                'fields' : {
-                    'target' : target,
-                    'actual' : actual,
-                    'state' : area_state,
-                    'battery' : battery,
-                    'device_state' : device_state
+                'measurement'   :  'heat',
+                'tags'          : {'name'   : room },
+                'fields'        : {'target' : target,
+                                   'actual' : actual,
+                                   'state'  : area_state,
+                                   'battery': battery,
+                                   'device_state' : device_state
                 }})
         dbClient.write_points(influxdata)
     except Exception as e:
@@ -245,17 +245,18 @@ if __name__ == "__main__":
 
         strom_to_csv(stromz)
         strom_to_influx(dbClient, stromz)
-        print('strom2influx')
+        #print('strom2influx')
 
         skip += 1
 
-        if skip >= 20:
+        if skip >= 20:      #nur jeden 20ten Durchlauf die Temperaturen lesen und in DB schreiben
             data = ezrdata.poll_all()
             heizung_to_influx(dbClient, data)
+            print(data)
             
             data1 = ds18b20data.poll_all()
             ds18b20sensoren_to_influx(dbClient, data1)
-
+            print(data1)
             skip = 1
         
       except Exception as e:
