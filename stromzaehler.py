@@ -262,4 +262,5 @@ if __name__ == "__main__":
       except Exception as e:
           print("Fehler beim verarbeiten", e)
 
+
       time.sleep(INTERVAL_SECS)
