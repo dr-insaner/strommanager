@@ -2,7 +2,7 @@
 #-*- coding:utf-8 -*-
 
 import os
-import glob
+#import glob
 import time
 import urllib.request
  
@@ -37,17 +37,24 @@ i=0 #Zähler für die Sensoren
 #Number_Of_Files=0
 
 def switch_zirkulationspumpe(data):
-    if data[6][1]>50 and data[8][1]>40: # data[6] 'SpeicherOben' und data[8] 'SolarVorlauf'
-        fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20ON")
-        mybytes = fp.read()
-        mystring = mybytes.decode("utf8")
-        fp.close()
+    if data[6][1]>55 and data[8][1]>55: # data[6] 'SpeicherOben' und data[8] 'SolarVorlauf'
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20ON")
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            fp.close()
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":"ON"}'
     else:
-        fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20OFF")
-        mybytes = fp.read()
-        mystring = mybytes.decode("utf8")
-        fp.close()
-    #print(mystring)
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20OFF")
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            fp.close()
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":"OFF"}'
     if mystring == '{"POWER":"OFF"}':
         pumpstate = 0
     elif mystring == '{"POWER":"ON"}':
