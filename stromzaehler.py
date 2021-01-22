@@ -7,23 +7,34 @@ import struct
 import influxdb
 import ezrdata
 import ds18b20data
+import urllib.request
 
 
 # Konstanten
-SPANNUNG_PV = bytes.fromhex('01040000000271cb') #Spannung
-STROM_PV =    bytes.fromhex('0104000600069009') #Strom
-LEISTUNG_PV = bytes.fromhex('0104000C000C300C') #Leistung
-VERBRAUCH_PV = bytes.fromhex('010400480048702A') #Verbrauch
-EINSPEISUNG_PV  = bytes.fromhex('0104004a004a502b') #Einspeisung
-PF_PV =  bytes.fromhex('0104001E001E1004') #Power factor PV
+#PV-klein
+SPANNUNG_PV = bytes.fromhex('01040000000271cb') #Spannung V
+STROM_PV =    bytes.fromhex('0104000600069009') #Strom A
+LEISTUNG_PV = bytes.fromhex('0104000C000C300C') #Leistung w
+VERBRAUCH_PV = bytes.fromhex('010400480048702A') #Verbrauch kWh
+EINSPEISUNG_PV  = bytes.fromhex('0104004a004a502b') #Einspeisung kWh
+PF_PV =  bytes.fromhex('0104001E001E1004') #Power factor PV -
 
-SPANNUNG1 = bytes.fromhex('02040000000271F8') #Spannung
-SPANNUNG2 = bytes.fromhex('020400020002D038') #Spannung
-SPANNUNG3 = bytes.fromhex('0204000400023039') #Spannung
+#PV-SMA
+SPANNUNG_PV2 = bytes.fromhex('0304000000027029') #Spannung V
+STROM_PV2 =    bytes.fromhex('03040006000691EB') #Strom A
+LEISTUNG_PV2 = bytes.fromhex('0304000C000C31EE') #Leistung W
+VERBRAUCH_PV2 = bytes.fromhex('03040048004871C8') #Verbrauch kWh
+EINSPEISUNG_PV2  = bytes.fromhex('0304004a004a51C9') #Einspeisung kWh
+PF_PV2 =  bytes.fromhex('0304001E001E11E6') #Power factor PV -
 
-STROM1 =    bytes.fromhex('020400060006903A') #Strom
-STROM2 =    bytes.fromhex('020400080006F1F9') #Strom
-STROM3 =    bytes.fromhex('0204000a00065039') #Strom
+#Netzzähler
+SPANNUNG1 = bytes.fromhex('02040000000271F8') #Spannung V
+SPANNUNG2 = bytes.fromhex('020400020002D038') #Spannung V
+SPANNUNG3 = bytes.fromhex('0204000400023039') #Spannung V
+
+STROM1 =    bytes.fromhex('020400060006903A') #Strom A
+STROM2 =    bytes.fromhex('020400080006F1F9') #Strom A
+STROM3 =    bytes.fromhex('0204000a00065039') #Strom A
 
 LEISTUNG =  bytes.fromhex('020400340034B020') #Leistung
 LEISTUNG1 = bytes.fromhex('0204000C000C303F') #Leistung 1
@@ -43,6 +54,8 @@ SERVER_DATA_DIR = '/home/pi/stromzaehler/data'
 WINDOWS_DATA_DIR = 'testdata'
 
 INTERVAL_SECS = 1
+
+
 
 def _WertParsen(antwort):
   #return round(float(np.frombuffer(bytes(reversed(antwort[3:7])),dtype=np.float32)),1)
@@ -70,56 +83,78 @@ class StromZaehler:
     def update(self):
         try:
             #Stromzähler PV
-            self.dec_spannung_pv = self.HoleWert(SPANNUNG_PV)
-            self.dec_strom_pv = self.HoleWert(STROM_PV)
-            self.dec_leistung_pv = -1*self.HoleWert(LEISTUNG_PV)
-            self.dec_verbrauch_pv = self.HoleWert(VERBRAUCH_PV)
-            self.dec_einspeisung_pv = self.HoleWert(EINSPEISUNG_PV)
-            self.dec_pf_pv = self.HoleWert(PF_PV)
+            self.dec_spannung_pv = self.HoleWert(SPANNUNG_PV) #Rohwert aus Zähler
+            self.dec_strom_pv = self.HoleWert(STROM_PV) #Rohwert aus Zähler
+            self.dec_leistung_pv = -1*self.HoleWert(LEISTUNG_PV) #Rohwert aus Zähler
+            self.dec_verbrauch_pv = self.HoleWert(VERBRAUCH_PV) #Rohwert aus Zähler
+            self.dec_einspeisung_pv = self.HoleWert(EINSPEISUNG_PV) #Rohwert aus Zähler [kWh]
+            self.dec_pf_pv = self.HoleWert(PF_PV) #Rohwert aus Zähler
+
+            #Stromzähler PV2
+            self.dec_spannung_pv2 = self.HoleWert(SPANNUNG_PV2) #Rohwert aus Zähler
+            self.dec_strom_pv2 = self.HoleWert(STROM_PV2) #Rohwert aus Zähler
+            self.dec_leistung_pv2 = -1*self.HoleWert(LEISTUNG_PV2) #Rohwert aus Zähler
+            self.dec_verbrauch_pv2 = self.HoleWert(VERBRAUCH_PV2) #Rohwert aus Zähler
+            self.dec_einspeisung_pv2 = self.HoleWert(EINSPEISUNG_PV2) #Rohwert aus Zähler
+            self.dec_pf_pv2 = self.HoleWert(PF_PV2) #Rohwert aus Zähler
 
             #Stromzähler Netz
-            self.dec_spannung1 = self.HoleWert(SPANNUNG1)
-            self.dec_spannung2 = self.HoleWert(SPANNUNG2)
-            self.dec_spannung3 = self.HoleWert(SPANNUNG3)
+            self.dec_spannung1 = self.HoleWert(SPANNUNG1) #Rohwert aus Zähler
+            self.dec_spannung2 = self.HoleWert(SPANNUNG2) #Rohwert aus Zähler
+            self.dec_spannung3 = self.HoleWert(SPANNUNG3) #Rohwert aus Zähler
 
-            self.dec_strom1 = self.HoleWert(STROM1)
-            self.dec_strom2 = self.HoleWert(STROM2)
-            self.dec_strom3 = self.HoleWert(STROM3)
+            self.dec_strom1 = self.HoleWert(STROM1) #Rohwert aus Zähler
+            self.dec_strom2 = self.HoleWert(STROM2) #Rohwert aus Zähler
+            self.dec_strom3 = self.HoleWert(STROM3) #Rohwert aus Zähler
+#soldierende Leistungen am Netzzählers, bedeutet die PV-Leistung ist schon abgezogen
+            self.dec_leistung = self.HoleWert(LEISTUNG)  #Rohwert aus Zähler
+            self.dec_leistung1 = self.HoleWert(LEISTUNG1) #Rohwert aus Zähler
+            self.dec_leistung2 = self.HoleWert(LEISTUNG2) #Rohwert aus Zähler
+            self.dec_leistung3 = self.HoleWert(LEISTUNG3) #Rohwert aus Zähler
 
-            self.dec_leistung = self.HoleWert(LEISTUNG) #Leistungen sind Leistungen des Netzzählers, bedeutet die PV-Leistung ist schon abgezogen
-            self.dec_leistung1 = self.HoleWert(LEISTUNG1)
-            self.dec_leistung2 = self.HoleWert(LEISTUNG2)
-            self.dec_leistung3 = self.HoleWert(LEISTUNG3)
+            self.dec_verbrauch = self.HoleWert(VERBRAUCH)  #Rohwert aus Zähler
+            self.dec_einspeisung = self.HoleWert(EINSPEISUNG)  #Rohwert aus Zähler
 
-            self.dec_verbrauch = self.HoleWert(VERBRAUCH)
-            self.dec_einspeisung = self.HoleWert(EINSPEISUNG)
+            self.dec_pf1 = self.HoleWert(PF1)  #Rohwert aus Zähler
+            self.dec_pf2 = self.HoleWert(PF2)  #Rohwert aus Zähler
+            self.dec_pf3 = self.HoleWert(PF3)  #Rohwert aus Zähler
 
-            self.dec_pf1 = self.HoleWert(PF1)
-            self.dec_pf2 = self.HoleWert(PF2)
-            self.dec_pf3 = self.HoleWert(PF3)
+            self.dec_leistung_pv_ges = (self.dec_leistung_pv + self.dec_leistung_pv2)
+            self.dec_leistung_verbrauch = self.dec_leistung + self.dec_leistung_pv_ges #[W] Gesamtleistung aus Netz und PV / im Haushalt verbrauchte Leistung
 
             #Berechnungen zu PV Kennzahlen
-            if self.dec_leistung_pv > 0:
-                if self.dec_leistung > 0: #Leistung wird aus Netz bezogen
-                    self.dec_eigenverbrauch = self.dec_leistung_pv #im Falle von PV Leistung wird komplett selber verbraucht
+            if (self.dec_leistung_pv_ges) > 0:
+                if self.dec_leistung > 0: #Leistung wird aus Netz bezogen [W]
+                    self.dec_eigenverbrauch = self.dec_leistung_pv_ges #im Falle von PV Leistung wird komplett selber verbraucht
+                    self.dec_autarkie_ratio = 100.0 * self.dec_eigenverbrauch / (self.dec_leistung + self.dec_eigenverbrauch)
                 if self.dec_leistung < 0: #Einspeisung
-                    self.dec_eigenverbrauch = self.dec_leistung_pv + self.dec_leistung #im Falle von Netzeinspeisung (je nach Vorzeichen dec_leistung, noch nicht relevant)
-                self.dec_eigenverbrauch_ratio = 100.0 * self.dec_eigenverbrauch / self.dec_leistung_pv
-                self.dec_autarkie_ratio = 100.0 * self.dec_eigenverbrauch / (self.dec_leistung + self.dec_eigenverbrauch)
+                    self.dec_eigenverbrauch = self.dec_leistung_verbrauch #im Falle von Netzeinspeisung (je nach Vorzeichen dec_leistung, noch nicht relevant)
+                    self.dec_autarkie_ratio = 100.0
+                self.dec_eigenverbrauch_ratio = 100.0 * self.dec_eigenverbrauch / self.dec_leistung_pv_ges# wird >100% 
+                
 
-            if self.dec_leistung_pv == 0:
+
+            if (self.dec_leistung_pv_ges) == 0:
                 self.dec_eigenverbrauch = 0.0
                 self.dec_eigenverbrauch_ratio = 100.0
                 self.dec_autarkie_ratio = 0.0
 
-            self.dec_eigenverbrauch_summe = self.dec_einspeisung_pv - self.dec_einspeisung
+            self.dec_eigenverbrauch_summe = self.dec_einspeisung_pv + self.dec_einspeisung_pv2 - self.dec_einspeisung #[kWh]
             self.dec_gespart_summe = self.dec_eigenverbrauch_summe*0.25
-            ausgaben = 350
+            ausgaben = 350+336+540+1000+100+100
             #50€ FI und Sicherung
             #100€ Zwei Richtungszähler
-            #180€ Wechselrichter und Zubehör ErEne
-            #20€ Stecker Amazon
+            #180€ Wechselrichter klein und Zubehör ErEne
+            #20€ Stecker Amazon =350
+            #336€ Aluprofile Aufständerung
+            #540, SMA Sunny Boy 1.5 Wechselrichter
+            #1000, Heckert Module und 100 m Kabel
+            #100 Winkel Schrauben
+            #100 Klemmen Module und Klemmen Querstangen
             self.dec_gewinn_summe = self.dec_eigenverbrauch_summe*0.25-(ausgaben)
+
+            
+
 
         except Exception as e:
             print("Fehler beim Strom Daten holen", e)
@@ -148,45 +183,56 @@ def strom_to_csv(stromz):
                     stromz.dec_verbrauch, stromz.dec_einspeisung,
                     stromz.dec_spannung_pv, stromz.dec_strom_pv, stromz.dec_leistung_pv,
                     stromz.dec_verbrauch_pv, stromz.dec_einspeisung_pv,
-                    stromz.dec_eigenverbrauch, stromz.dec_eigenverbrauch_ratio, stromz.dec_autarkie_ratio,
-                    stromz.dec_eigenverbrauch_summe, stromz.dec_gespart_summe, stromz.dec_gewinn_summe,
-                    stromz.dec_pf_pv, stromz.dec_pf1, stromz.dec_pf2, stromz.dec_pf3])
+                    stromz.dec_spannung_pv2, stromz.dec_strom_pv2, stromz.dec_leistung_pv2,
+                    stromz.dec_verbrauch_pv2, stromz.dec_einspeisung_pv2,
+                    stromz.dec_leistung_pv_ges, stromz.dec_eigenverbrauch, stromz.dec_eigenverbrauch_ratio, stromz.dec_autarkie_ratio,
+                    stromz.dec_eigenverbrauch_summe, stromz.dec_gespart_summe, stromz.dec_gewinn_summe, stromz.dec_leistung_verbrauch,
+                    stromz.dec_pf_pv, stromz.dec_pf_pv2, stromz.dec_pf1, stromz.dec_pf2, stromz.dec_pf3])
 
     except Exception as e:
         print("Fehler beim Strom Daten als CSV speichern", e)
 
-def strom_to_influx(dbClient, stromz):
+def strom_to_influx(dbClient, stromz, verbraucherstate):
     try:
         influxdata = {
             'measurement' : 'power',
             'fields' : {
-                'spannung1' : stromz.dec_spannung1,
-                'spannung2' : stromz.dec_spannung2,
-                'spannung3' : stromz.dec_spannung3,
-                'strom1' : stromz.dec_strom1,
-                'strom2' : stromz.dec_strom2,
-                'strom3' : stromz.dec_strom3,
-                'leistung1' : stromz.dec_leistung1,
-                'leistung2' : stromz.dec_leistung2,
-                'leistung3' : stromz.dec_leistung3,
-                'leistung' : stromz.dec_leistung,
-                'verbrauch' : stromz.dec_verbrauch,
-                'einspeisung' : stromz.dec_einspeisung,
-                'spannung_pv' : stromz.dec_spannung_pv,
-                'strom_pv' : stromz.dec_strom_pv,
-                'leistung_pv' : stromz.dec_leistung_pv,
-                'verbrauch_pv' : stromz.dec_verbrauch_pv,
-                'einspeisung_pv' : stromz.dec_einspeisung_pv,
-                'eigenverbrauch_pv' : stromz.dec_eigenverbrauch,
-                'eigenverbrauch_percent' : stromz.dec_eigenverbrauch_ratio,
-                'autarkie_percent' : float(stromz.dec_autarkie_ratio),
+                'spannung1' : stromz.dec_spannung1,         #Rohwert aus Zähler [V]
+                'spannung2' : stromz.dec_spannung2,         #Rohwert aus Zähler [V]
+                'spannung3' : stromz.dec_spannung3,         #Rohwert aus Zähler [V]
+                'strom1' : stromz.dec_strom1,               #Rohwert aus Zähler [A]
+                'strom2' : stromz.dec_strom2,               #Rohwert aus Zähler [A]
+                'strom3' : stromz.dec_strom3,               #Rohwert aus Zähler [A]
+                'leistung1' : stromz.dec_leistung1,         #Rohwert aus Zähler [W]
+                'leistung2' : stromz.dec_leistung2,         #Rohwert aus Zähler [W]
+                'leistung3' : stromz.dec_leistung3,         #Rohwert aus Zähler [W]
+                'leistung' : stromz.dec_leistung,           #Rohwert aus Zähler [W]
+                'verbrauch' : stromz.dec_verbrauch,         #Rohwert aus Zähler [kWh]
+                'einspeisung' : stromz.dec_einspeisung,     #Rohwert aus Zähler [kWh]
+                'spannung_pv' : stromz.dec_spannung_pv,     #Rohwert aus Zähler [V]
+                'strom_pv' : stromz.dec_strom_pv,           #Rohwert aus Zähler [A]
+                'leistung_pv' : stromz.dec_leistung_pv,     #Rohwert aus Zähler [W]
+                'verbrauch_pv' : stromz.dec_verbrauch_pv,   #Rohwert aus Zähler [kWh]
+                'einspeisung_pv' : stromz.dec_einspeisung_pv, #Rohwert aus Zähler [kWh]
+                'spannung_pv2' : stromz.dec_spannung_pv2,   #Rohwert aus Zähler [V]
+                'strom_pv2' : stromz.dec_strom_pv2,         #Rohwert aus Zähler [A]
+                'leistung_pv2' : stromz.dec_leistung_pv2,   #Rohwert aus Zähler [W]
+                'verbrauch_pv2' : stromz.dec_verbrauch_pv2, #Rohwert aus Zähler [kWh]
+                'einspeisung_pv2' : stromz.dec_einspeisung_pv2, #Rohwert aus Zähler [kWh]
+                'einspeisung_pv_summe' : stromz.dec_leistung_pv_ges, #[W] dec_leistung_pv+dec_leistung_pv2 -> Summe der PV Produktion
+                'eigenverbrauch_pv' : stromz.dec_eigenverbrauch, #[W] -> Summe PV-Produktion - eingespeiste Leistung
+                'eigenverbrauch_percent' : stromz.dec_eigenverbrauch_ratio, #[%] Anteil eigenverbrauchter PV-Leistung
+                'autarkie_percent' : float(stromz.dec_autarkie_ratio), #[%] Verhältnis Strom aus Netz zu PV
                 'eigenverbrauch_summe' : stromz.dec_eigenverbrauch_summe,
                 'dec_gespart_summe' : stromz.dec_gespart_summe,
                 'dec_gewinn_summe' : stromz.dec_gewinn_summe,
-                'dec_pf_pv' : stromz.dec_pf_pv,
-                'dec_pf1' : stromz.dec_pf1,
-                'dec_pf2' : stromz.dec_pf2,
-                'dec_pf3' : stromz.dec_pf3
+                'dec_leistung_verbrauch' : stromz.dec_leistung_verbrauch, #[W] Verbrauchte Leistung im Haushalt
+                'dec_pf_pv' : stromz.dec_pf_pv,             #Rohwert aus Zähler [-]
+                'dec_pf_pv2' : stromz.dec_pf_pv2,           #Rohwert aus Zähler [-]
+                'dec_pf1' : stromz.dec_pf1,                 #Rohwert aus Zähler [-]
+                'dec_pf2' : stromz.dec_pf2,                 #Rohwert aus Zähler [-]
+                'dec_pf3' : stromz.dec_pf3,                 #Rohwert aus Zähler [-]
+                'Verbraucheranzahl' : verbraucherstate      #Anzahl geschalteter Verbraucher
             }}
         dbClient.write_points([influxdata])
     except Exception as e:
@@ -225,6 +271,76 @@ def ds18b20sensoren_to_influx(dbClient, data1):
     except Exception as e:
         print("Fehler beim speichern in influxdb (ds18b20sensoren)", e)
 
+def verbraucher_schalten(data, verbraucherstate):
+    """Funktion soll Zusatzverbraucher einschalten sobald ein gewisse Leistung eingespeist wird.
+     Ab dieser Leistung werden alle Zusatzverbraucher eingeschaltet und dann sukzessive abgeschaltet, sobald wieder Strom aus dem Netz bezogen wird.
+
+    Args:
+        data ([type]): stromz.dec_leistung. Die Leistung am Hauptzähler
+
+    Returns:
+        [integer]: Der Rückgabewert ist die Anzahl der Zusatzverbraucher, die gerade eingeschaltet sind
+    """
+    print('Gesamt-Leistung: {}'.format(data))
+    if data<-150 and verbraucherstate == 0: #dec_leistung<-150 bei 0 Verbrauchern Verbraucher 1 einschalten
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.187/cm?cmnd=Power1%20ON") #Waschküche
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            if mystring == '{"POWER":"ON"}':
+                verbraucherstate = 1
+            else:
+                verbraucherstate = 9
+            fp.close()
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":""}'
+            verbraucherstate = 9
+    if data<-150 and verbraucherstate == 1: #dec_leistung<-150 bei 1 Verbrauchern Verbraucher 2 einschalten
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20ON") #Speisekammer
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            if mystring == '{"POWER":"ON"}':
+                verbraucherstate = 2
+            else:
+                verbraucherstate = 9
+            fp.close()
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":""}'
+            verbraucherstate = 9
+    if data>50 and verbraucherstate == 1:
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.187/cm?cmnd=Power1%20OFF") #Waschküche
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            if mystring == '{"POWER":"OFF"}':
+                verbraucherstate = 0
+            else:
+                verbraucherstate = 9
+            fp.close()
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":""}'
+            verbraucherstate = 9
+    if data>50 and verbraucherstate == 2:
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.186/cm?cmnd=Power1%20OFF") #Speisekammer
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            if mystring == '{"POWER":"OFF"}':
+                verbraucherstate = 1
+            else:
+                verbraucherstate = 9
+            fp.close()
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":""}'
+            verbraucherstate = 9
+
+    return verbraucherstate
+
 
 if __name__ == "__main__":
     dbClient = influxdb.InfluxDBClient(
@@ -232,8 +348,12 @@ if __name__ == "__main__":
 
     stromz = StromZaehler()
     skip=1
+
+    verbraucherstate = 0
+
     while True:
       try:
+
         stromz.update()
 
         print(
@@ -243,12 +363,17 @@ if __name__ == "__main__":
             stromz.dec_leistung3, 'W,',
             stromz.dec_verbrauch, 'kWh')
 
+
+        #Verbraucher schalten
+        print('Trocknerstatus: {}'.format(verbraucher_schalten(stromz.dec_leistung, verbraucherstate)))
+        verbraucherstate = verbraucher_schalten(stromz.dec_leistung, verbraucherstate) #Funktionsaufruf
+
         strom_to_csv(stromz)
-        strom_to_influx(dbClient, stromz)
+        strom_to_influx(dbClient, stromz, verbraucherstate)
         #print('strom2influx')
 
-        skip += 1
 
+        skip += 1
         if skip >= 20:      #nur jeden 20ten Durchlauf die Temperaturen lesen und in DB schreiben
             data = ezrdata.poll_all()
             heizung_to_influx(dbClient, data)
