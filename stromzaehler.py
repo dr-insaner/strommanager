@@ -5,11 +5,16 @@ import socket, time, datetime, platform, os
 import csv
 import struct
 import influxdb
+<<<<<<< HEAD
+import verbraucherschalten  #meine Funktion zum Verbraucher schalten
+from pyModbusTCP.client import ModbusClient #für sma Wechselrichter
+=======
 import ezrdata              #meine Funktion zum Auslesen der Fußbodenheizung
 import ds18b20data          #meine Funktion zum Heizungssensoren lesen
 import verbraucherschalten  #meine Funktion zum Verbraucher schalten
 import urllib.request
 
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
 
 # Konstanten
 #PV-klein
@@ -54,7 +59,29 @@ WARTEN_AUF_ANTWORT_SEKUNDEN = 5
 SERVER_DATA_DIR = '/home/pi/stromzaehler/data'
 WINDOWS_DATA_DIR = 'testdata'
 
-INTERVAL_SECS = 1
+# SMA Wechselrichter ----------------------------------------------------------------
+SERVER_HOST = "192.168.2.84"    #SMA Wechselrichter
+SERVER_PORT = 502               #SMA Wechselrichter
+#Modbus-Befehle aus: https://files.sma.de/downloads/MODBUS-HTML_SBxx-1VL-40_V12.zip
+register_Operation_Health       = 30201 #35: Fehler (Alm) 303: Aus (Off) 307: Ok (Ok) 455: Warnung (Wrn)
+register_Operation_DrtStt       = 30219 #Grund der Leistungsreduzierung 557: Uebertemperatur (TmpDrt) 884: nicht aktiv (NoneDrt) 1705: Frequenzabweichung (HzDrt) 3520: Spannungsabweichung (VDrt) 3554: Blindleistungsprioritaet (VArDmdDrt) 3556: Hohe DC-Spannung (DcVolMaxDrt) 4560: Externer Vorgabe (WSptMaxDrt) 4561: Externe Vorgabe 2 (WSptMax2Drt) 16777213: Information liegt nicht vor (NaNStt)
+register_Operation_StandbyStt   = 33001 #Standby-Status 1393: Warte auf PV-Spannung (WaitPV) 1394: Warte auf gueltiges AC-Netz (WaitGri) 2531: Energiesparmodus (EnSavMod) 16777213: Information liegt nicht vor (NaNStt)
+register_Operation_RunStt       = 33003 #Betriebsstatus 295: MPP (Mpp) 443: Konstantspannung (VolDCConst) 1463: Backup (Bck) 1469: Herunterfahren (Shtdwn) 2119: Abregelung (Drt) 16777213: Information liegt nicht vor (NaNStt)
+Inverter_WModCfg_WCnstCfg_W_RO  = 30837 #Wirkleistungsbegrenzung in W
+Inverter_WModCfg_WCnstCfg_WNom_RO=30839 #Wirkleistungsbegrenzung in %
+Inverter_WModCfg_WMod           = 30835 #Betriebsart Wirkleistungsvorgabe
+Inverter_WModCfg_WCtlComCfg_WNom= 40016 #Normierte Wirkleistungsbegrenzung durch Anlagensteuerung
+leistungsbegrenzung = 100 # in %
+bets = 2
+
+c = ModbusClient(unit_id=3)
+c.host(SERVER_HOST)
+c.port(SERVER_PORT)
+#--------------------------------------------------------------------------------------
+
+
+INTERVAL_SECS = 2   #Wartezeit in der Endlosschleife
+
 
 
 
@@ -74,21 +101,30 @@ class StromZaehler:
                 antwort = self.sock.recv(4096)
                 return _WertParsen(antwort)
             except socket.timeout as e:
-                print("Timeout, versuche es wieder ...", e)
+                print("Timeout, versuche es wieder (Modbus) ...", e)
                 time.sleep(1)
             except socket.error as e:
                 # Something else happened, handle error, exit, etc.
-                print("Anderer Socket Fehler:", e)
+                print("Anderer Socket Fehler (Modbus):", e)
                 time.sleep(5)
 
     def update(self):
         try:
+            self.dec_pf_pv = self.HoleWert(PF_PV) #Phase Stromzähler PV klein
+            self.dec_pf_pv2 = self.HoleWert(PF_PV2) #Phase Stromzähler PV groß
+            self.dec_pf1 = self.HoleWert(PF1)  #Phase1 Stromzähler Netz
+            self.dec_pf2 = self.HoleWert(PF2)  #Phase2 Stromzähler Netz
+            self.dec_pf3 = self.HoleWert(PF3)  #Phase3 Stromzähler Netz
+
             #Stromzähler PV
             self.dec_spannung_pv = self.HoleWert(SPANNUNG_PV) #Rohwert aus Zähler
             self.dec_strom_pv = self.HoleWert(STROM_PV) #Rohwert aus Zähler
             self.dec_leistung_pv = -1*self.HoleWert(LEISTUNG_PV) #Rohwert aus Zähler
             self.dec_verbrauch_pv = self.HoleWert(VERBRAUCH_PV) #Rohwert aus Zähler
             self.dec_einspeisung_pv = self.HoleWert(EINSPEISUNG_PV) #Rohwert aus Zähler [kWh]
+<<<<<<< HEAD
+            
+=======
             self.dec_pf_pv = self.HoleWert(PF_PV) #Rohwert aus Zähler
 
             #Stromzähler PV2
@@ -98,11 +134,33 @@ class StromZaehler:
             self.dec_verbrauch_pv2 = self.HoleWert(VERBRAUCH_PV2) #Rohwert aus Zähler
             self.dec_einspeisung_pv2 = self.HoleWert(EINSPEISUNG_PV2) #Rohwert aus Zähler
             self.dec_pf_pv2 = self.HoleWert(PF_PV2) #Rohwert aus Zähler
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
 
+            #Stromzähler PV2
+            self.dec_spannung_pv2 = self.HoleWert(SPANNUNG_PV2) #Rohwert aus Zähler
+            self.dec_strom_pv2 = self.HoleWert(STROM_PV2) #Rohwert aus Zähler
+            self.dec_leistung_pv2 = -1*self.HoleWert(LEISTUNG_PV2) #Rohwert aus Zähler
+            self.dec_verbrauch_pv2 = self.HoleWert(VERBRAUCH_PV2) #Rohwert aus Zähler
+            self.dec_einspeisung_pv2 = self.HoleWert(EINSPEISUNG_PV2) #Rohwert aus Zähler
+            
             #Stromzähler Netz
             self.dec_spannung1 = self.HoleWert(SPANNUNG1) #Rohwert aus Zähler
             self.dec_spannung2 = self.HoleWert(SPANNUNG2) #Rohwert aus Zähler
             self.dec_spannung3 = self.HoleWert(SPANNUNG3) #Rohwert aus Zähler
+<<<<<<< HEAD
+
+            self.dec_strom1 = self.HoleWert(STROM1) #Rohwert aus Zähler
+            self.dec_strom2 = self.HoleWert(STROM2) #Rohwert aus Zähler
+            self.dec_strom3 = self.HoleWert(STROM3) #Rohwert aus Zähler
+#soldierende Leistungen am Netzzählers, bedeutet die PV-Leistung ist schon abgezogen
+            self.dec_leistung = self.HoleWert(LEISTUNG)  #Rohwert aus Zähler
+            self.dec_leistung1 = self.HoleWert(LEISTUNG1) #Rohwert aus Zähler
+            self.dec_leistung2 = self.HoleWert(LEISTUNG2) #Rohwert aus Zähler
+            self.dec_leistung3 = self.HoleWert(LEISTUNG3) #Rohwert aus Zähler
+
+            self.dec_verbrauch = self.HoleWert(VERBRAUCH)  #Rohwert aus Zähler
+            self.dec_einspeisung = self.HoleWert(EINSPEISUNG)  #Rohwert aus Zähler
+=======
 
             self.dec_strom1 = self.HoleWert(STROM1) #Rohwert aus Zähler
             self.dec_strom2 = self.HoleWert(STROM2) #Rohwert aus Zähler
@@ -119,6 +177,7 @@ class StromZaehler:
             self.dec_pf1 = self.HoleWert(PF1)  #Rohwert aus Zähler
             self.dec_pf2 = self.HoleWert(PF2)  #Rohwert aus Zähler
             self.dec_pf3 = self.HoleWert(PF3)  #Rohwert aus Zähler
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
 
             self.dec_leistung_pv_ges = (self.dec_leistung_pv + self.dec_leistung_pv2)
             self.dec_leistung_verbrauch = self.dec_leistung + self.dec_leistung_pv_ges #[W] Gesamtleistung aus Netz und PV / im Haushalt verbrauchte Leistung
@@ -193,7 +252,11 @@ def strom_to_csv(stromz):
     except Exception as e:
         print("Fehler beim Strom Daten als CSV speichern", e)
 
+<<<<<<< HEAD
+def strom_to_influx(dbClient, stromz, verbraucherstate, begrenzung_pz_PV2):
+=======
 def strom_to_influx(dbClient, stromz, verbraucherstate):
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
     try:
         influxdata = {
             'measurement' : 'power',
@@ -233,44 +296,30 @@ def strom_to_influx(dbClient, stromz, verbraucherstate):
                 'dec_pf1' : stromz.dec_pf1,                 #Rohwert aus Zähler [-]
                 'dec_pf2' : stromz.dec_pf2,                 #Rohwert aus Zähler [-]
                 'dec_pf3' : stromz.dec_pf3,                 #Rohwert aus Zähler [-]
+<<<<<<< HEAD
+                'Verbraucheranzahl' : verbraucherstate,     #Anzahl geschalteter Verbraucher
+                'Begrenzung PV2' : begrenzung_pz_PV2              #Anzahl geschalteter Verbraucher
+=======
                 'Verbraucheranzahl' : verbraucherstate      #Anzahl geschalteter Verbraucher
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
             }}
         dbClient.write_points([influxdata])
     except Exception as e:
         print("Fehler beim Speichern in influxdb (power)", e)
 
-def heizung_to_influx(dbClient, data):
-    try:
-        influxdata = []
-        for item in data:
-            room, actual, target, area_state, battery, device_state = item
-            influxdata.append({
-                'measurement'   :  'heat',
-                'tags'          : {'name'   : room },
-                'fields'        : {'target' : target,
-                                   'actual' : actual,
-                                   'state'  : area_state,
-                                   'battery': battery,
-                                   'device_state' : device_state
-                }})
-        dbClient.write_points(influxdata)
-    except Exception as e:
-        print("Fehler beim speichern in influxdb (heat)", e)
+def sma_begrenzung(data, verbraucherstate):
+    
+    if verbraucherstate==3 and data < -50:
+        leistungsbegrenzung = (1-(data+30)/1500)*100
+        Inverter_WModCfg_WCtlComCfg_WNom_write= c.write_single_register(Inverter_WModCfg_WCtlComCfg_WNom, leistungsbegrenzung)
+        print("Inverter_WModCfg_WCtlComCfg_WNom (" + str(Inverter_WModCfg_WCtlComCfg_WNom) + ", " + str(bets) + ") -->" +str(Inverter_WModCfg_WCtlComCfg_WNom_write))
 
-def ds18b20sensoren_to_influx(dbClient, data1):
-    try:
-        influxdata = []
-        for item in data1:
-            sensor, temperature = item
-            influxdata.append({
-                'measurement' : 'ds18b20sensoren',
-                'tags' : { 'name' : sensor },
-                'fields' : {
-                    'temperature' : temperature,
-                }})
-        dbClient.write_points(influxdata)
-    except Exception as e:
-        print("Fehler beim speichern in influxdb (ds18b20sensoren)", e)
+    else:
+        leistungsbegrenzung=100
+        Inverter_WModCfg_WCtlComCfg_WNom_write= c.write_single_register(Inverter_WModCfg_WCtlComCfg_WNom, leistungsbegrenzung)
+        print("Inverter_WModCfg_WCtlComCfg_WNom (" + str(Inverter_WModCfg_WCtlComCfg_WNom) + ", " + str(bets) + ") -->" +str(Inverter_WModCfg_WCtlComCfg_WNom_write))
+
+    return leistungsbegrenzung
 
 """ def verbraucher_schalten(data, verbraucherstate):
     Funktion soll Zusatzverbraucher einschalten sobald ein gewisse Leistung eingespeist wird.
@@ -385,7 +434,11 @@ if __name__ == "__main__":
         host='localhost', username='admin', password='none', database='home')
 
     stromz = StromZaehler()
+<<<<<<< HEAD
+    skip_csv=1
+=======
     skip=1
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
 
     verbraucherstate = 0
 
@@ -401,6 +454,21 @@ if __name__ == "__main__":
             stromz.dec_leistung3, 'W,',
             stromz.dec_verbrauch, 'kWh')
 
+<<<<<<< HEAD
+
+        #Verbraucher schalten und Wechselrichterlimitierung
+        verbraucherstate = verbraucherschalten.verbraucher_schalten(stromz.dec_leistung, verbraucherstate) #Funktionsaufruf
+        begrenzung_pz_PV2 = sma_begrenzung(stromz.dec_leistung, verbraucherstate)
+
+        print('Begrenzung: {}'.format(begrenzung_pz_PV2))
+
+        
+        if skip_csv == 5: 
+            strom_to_csv(stromz)
+            skip_csv=1
+            print('strom2csv')
+            #stromz.update_slow()
+=======
 
         #Verbraucher schalten
         print('Trocknerstatus: {}'.format(verbraucherschalten.verbraucher_schalten(stromz.dec_leistung, verbraucherstate)))
@@ -415,14 +483,12 @@ if __name__ == "__main__":
             data = ezrdata.poll_all()
             heizung_to_influx(dbClient, data)
             print(data)
+>>>>>>> c81bbbaf03ea03249053be5527258167aa96f7da
             
-            data1 = ds18b20data.poll_all()
-            ds18b20sensoren_to_influx(dbClient, data1)
-            print(data1)
-            skip = 1
+        strom_to_influx(dbClient, stromz, verbraucherstate, begrenzung_pz_PV2)
         
       except Exception as e:
           print("Fehler beim verarbeiten", e)
 
-
+      skip_csv = skip_csv+1
       time.sleep(INTERVAL_SECS)
