@@ -3,7 +3,10 @@
 #-*- coding:utf-8 -*-
 
 import urllib.request
+import paho.mqtt.publish as publish
 
+MQTT_SERVER = "192.168.2.150"
+MQTT_PATH = "/home/pwr_soll_1"
 
 def verbraucher_schalten(data, verbraucherstate):
     """Funktion soll Zusatzverbraucher einschalten sobald ein gewisse Leistung eingespeist wird.
@@ -15,7 +18,9 @@ def verbraucher_schalten(data, verbraucherstate):
     Returns:
         [integer]: Der Rückgabewert ist die Anzahl der Zusatzverbraucher, die gerade eingeschaltet sind
     """
-    print('Gesamt-Leistung: {}'.format(data))
+    print('Gesamt-Leistung: {} und Status: {}'.format(data, verbraucherstate))
+    publish.single(MQTT_PATH, data, hostname=MQTT_SERVER)
+    
     if data<-240 and verbraucherstate == 2: #dec_leistung<-150 bei 1 Verbrauchern Verbraucher 2 einschalten
         try:
             fp = urllib.request.urlopen("http://192.168.2.177/cm?cmnd=Power1%20ON") #Badheizung
@@ -111,8 +116,9 @@ def verbraucher_schalten(data, verbraucherstate):
             mystring = '{"POWER":""}'
             verbraucherstate = 13
     return verbraucherstate
+    
 
 
 if __name__ == "__main__":
-    verbraucherstate = verbraucher_schalten(1000, verbraucherstate) #Funktionsaufruf Leistung als Integer
+    verbraucherstate = verbraucher_schalten(1000, 0) #Funktionsaufruf Leistung als Integer
     print(verbraucherstate)
