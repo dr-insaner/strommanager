@@ -4,11 +4,9 @@
 
 import urllib.request
 import paho.mqtt.publish as publish
+import paho.mqtt.client as mqtt
 
-MQTT_SERVER = "192.168.2.150"
-MQTT_PATH = "/home/pwr_soll_1"
-
-def verbraucher_schalten(data, verbraucherstate):
+def verbraucher_schalten(data, dimmer1, verbraucherstate):
     """Funktion soll Zusatzverbraucher einschalten sobald ein gewisse Leistung eingespeist wird.
      Ab dieser Leistung werden alle Zusatzverbraucher eingeschaltet und dann sukzessive abgeschaltet, sobald wieder Strom aus dem Netz bezogen wird.
 
@@ -19,11 +17,9 @@ def verbraucher_schalten(data, verbraucherstate):
         [integer]: Der Rückgabewert ist die Anzahl der Zusatzverbraucher, die gerade eingeschaltet sind
     """
     print('Gesamt-Leistung: {} und Status: {}'.format(data, verbraucherstate))
-    publish.single(MQTT_PATH, data, hostname=MQTT_SERVER)
-    
-    if data<-240 and verbraucherstate == 2: #dec_leistung<-150 bei 1 Verbrauchern Verbraucher 2 einschalten
+    if data<-50 and verbraucherstate == 2: #dec_leistung<-120 bei 1 Verbrauchern Verbraucher 2 einschalten
         try:
-            fp = urllib.request.urlopen("http://192.168.2.177/cm?cmnd=Power1%20ON") #Badheizung
+            fp = urllib.request.urlopen("http://192.168.2.177/cm?cmnd=Power1%20ON") #Infrarotheizung
             mybytes = fp.read()
             mystring = mybytes.decode("utf8")
             if mystring == '{"POWER":"ON"}':
@@ -36,7 +32,7 @@ def verbraucher_schalten(data, verbraucherstate):
             print("OS error: {0}".format(err))
             mystring = '{"POWER":""}'
             verbraucherstate = 13
-    if data<-100 and verbraucherstate == 1: #dec_leistung<-150 bei 1 Verbrauchern Verbraucher 2 einschalten
+    if data<-50 and verbraucherstate == 1: #dec_leistung<-150 bei 1 Verbrauchern Verbraucher 2 einschalten
         try:
             fp = urllib.request.urlopen("http://192.168.2.176/cm?cmnd=Power1%20ON") #Speisekammer
             mybytes = fp.read()
@@ -51,7 +47,7 @@ def verbraucher_schalten(data, verbraucherstate):
             print("OS error: {0}".format(err))
             mystring = '{"POWER":""}'
             verbraucherstate = 12
-    if data<-100 and verbraucherstate == 0: #dec_leistung<-150 bei 0 Verbrauchern Verbraucher 1 einschalten
+    if data<-50 and verbraucherstate == 0: #dec_leistung<-150 bei 0 Verbrauchern Verbraucher 1 einschalten
         try:
             fp = urllib.request.urlopen("http://192.168.2.187/cm?cmnd=Power1%20ON") #Waschküche
             mybytes = fp.read()
@@ -85,6 +81,21 @@ def verbraucher_schalten(data, verbraucherstate):
             print("OS error: {0}".format(err))
             mystring = '{"POWER":""}'
             verbraucherstate = 11
+        try:
+            fp = urllib.request.urlopen("http://192.168.2.177/cm?cmnd=Power1%20OFF") #Badheizung
+            mybytes = fp.read()
+            mystring = mybytes.decode("utf8")
+            if mystring == '{"POWER":"OFF"}':
+                verbraucherstate = 0
+            else:
+                verbraucherstate = 13
+            fp.close()
+            print('Verbraucher 3 auch aus: {}'.format(verbraucherstate))
+        except OSError as err:
+            print("OS error: {0}".format(err))
+            mystring = '{"POWER":""}'
+            verbraucherstate = 13
+
     if data>50 and verbraucherstate == 2 or verbraucherstate == 12 and data>50:
         try:
             fp = urllib.request.urlopen("http://192.168.2.176/cm?cmnd=Power1%20OFF") #Speisekammer
@@ -120,5 +131,5 @@ def verbraucher_schalten(data, verbraucherstate):
 
 
 if __name__ == "__main__":
-    verbraucherstate = verbraucher_schalten(1000, 0) #Funktionsaufruf Leistung als Integer
+    verbraucherstate = verbraucher_schalten(500, 0) #Funktionsaufruf Leistung als Integer, negativ PV Überschuss
     print(verbraucherstate)
